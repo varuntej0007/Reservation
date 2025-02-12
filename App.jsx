@@ -8,8 +8,9 @@ const App = () => {
   const [reservations, setReservations] = useState([]);
   const [form, setForm] = useState({ name: "", phone: "", guests: "" });
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("theme") === "dark");
-  const [totalGuests, setTotalGuests] = useState(0);
-  const [occupiedSeats, setOccupiedSeats] = useState(0); // Dynamic count
+  const [occupiedSeats, setOccupiedSeats] = useState(0);
+  const [totalGuests, setTotalGuests] = useState(0); // Track total guests served
+  const availableSeats = TOTAL_SEATS - occupiedSeats; // Dynamic available seats
 
   useEffect(() => {
     document.body.classList.toggle("dark-mode", darkMode);
@@ -25,18 +26,31 @@ const App = () => {
     const guestsCount = parseInt(form.guests, 10);
 
     if (!form.name || !form.phone || !form.guests) return alert("Fill all fields");
-    if (guestsCount + occupiedSeats > TOTAL_SEATS) return alert("Not enough available seats!");
+    if (guestsCount > availableSeats) return alert("Not enough available seats!");
 
-    setReservations([...reservations, { id: Date.now(), ...form, guests: guestsCount, checkIn: new Date().toLocaleTimeString(), checkOut: null }]);
-    setTotalGuests(totalGuests + guestsCount);
-    setOccupiedSeats(occupiedSeats + guestsCount);
+    const now = new Date();
+    const formattedDate = now.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    const formattedDay = now.toLocaleDateString("en-US", { weekday: "long" });
+
+    setReservations([...reservations, { 
+      id: Date.now(), 
+      ...form, 
+      guests: guestsCount, 
+      checkIn: now.toLocaleTimeString(), 
+      checkOut: null,
+      date: formattedDate, 
+      day: formattedDay
+    }]);
+
+    setOccupiedSeats(prev => prev + guestsCount);
+    setTotalGuests(prev => prev + guestsCount);
     setForm({ name: "", phone: "", guests: "" });
   };
 
   const handleCheckout = (id) => {
     const updatedReservations = reservations.map(res => {
-      if (res.id === id) {
-        setOccupiedSeats(occupiedSeats - res.guests); // Free up seats
+      if (res.id === id && !res.checkOut) {
+        setOccupiedSeats(prev => prev - res.guests); // Free up seats
         return { ...res, checkOut: new Date().toLocaleTimeString() };
       }
       return res;
@@ -47,7 +61,8 @@ const App = () => {
   const handleDelete = (id) => {
     const deletedGuest = reservations.find(res => res.id === id);
     if (deletedGuest && !deletedGuest.checkOut) {
-      setOccupiedSeats(occupiedSeats - deletedGuest.guests);
+      setOccupiedSeats(prev => prev - deletedGuest.guests);
+      setTotalGuests(prev => prev - deletedGuest.guests); // Reduce total guests if deleted before checkout
     }
     setReservations(reservations.filter(res => res.id !== id));
   };
@@ -55,7 +70,7 @@ const App = () => {
   return (
     <div className="app-container">
       <header className="header">
-        <h1>🍽️ The Grand Dine</h1>  {/* Restaurant Name Added */}
+        <h1>🍽️ The Grand Dine</h1>
         <button className="theme-toggle" onClick={() => setDarkMode(!darkMode)}>
           {darkMode ? <FiSun /> : <FiMoon />}
         </button>
@@ -75,7 +90,7 @@ const App = () => {
         </div>
         <div className="info-box available fixed-box">
           <span>Available Seats</span>
-          <h2>{TOTAL_SEATS}</h2> {/* Always Fixed at 50 */}
+          <h2>{availableSeats}</h2> {/* Dynamic calculation */}
         </div>
       </div>
 
@@ -94,6 +109,7 @@ const App = () => {
             <h3>{res.name}</h3>
             <p>📞 {res.phone}</p>
             <p>🧍 {res.guests} Guests</p>
+            <p>📅 {res.day}, {res.date}</p> {/* Date & Day Added */}
             <p>⏳ Check-In: {res.checkIn}</p>
             <p>✅ Check-Out: {res.checkOut || "Pending"}</p>
             {!res.checkOut ? (
